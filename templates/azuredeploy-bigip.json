@@ -9,6 +9,13 @@
             },
             "type": "string"
         },
+       "adminUsernameUbuntu": {
+         "defaultValue": "ubuntu",
+         "type": "string",
+         "metadata": {
+            "description": "User name for Ubuntu host."
+            }
+        },
         "authenticationType": {
             "allowedValues": [
                 "password",
@@ -25,6 +32,25 @@
                 "description": "Password or SSH public key to login to the Virtual Machine. Note: There are a number of special characters that you should avoid using for F5 product user accounts.  See [K2873](https://support.f5.com/csp/article/K2873) for details. Note: If using key-based authentication, this should be the public key as a string, typically starting with **---- BEGIN SSH2 PUBLIC KEY ----** and ending with **---- END SSH2 PUBLIC KEY ----**."
             },
             "type": "securestring"
+        },
+        "adminPasswordOrKeyUbuntu": {
+            "type": "securestring",
+            "metadata": {
+                "description": "SSH Key or password for the Virtual Machine. "
+            }
+        },
+        "ubuntuOSVersion": {
+            "type": "string",
+            "defaultValue": "16.04.0-LTS",
+            "allowedValues": [
+                "12.04.5-LTS",
+                "14.04.5-LTS",
+                "16.04.0-LTS",
+                "18.04-LTS"
+            ],
+            "metadata": {
+                "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version."
+            }
         },
         "dnsLabel": {
             "metadata": {
@@ -204,7 +230,7 @@
             "type": "string"
         },
         "declarationUrl": {
-            "defaultValue": "NOT_SPECIFIED",
+            "defaultValue": "https://raw.githubusercontent.com/mikeoleary/azure-f5-lb/master/declaration.json",
             "metadata": {
                 "description": "URL for the AS3 (https://clouddocs.f5.com/products/extensions/f5-appsvcs-extension/3.5.1/) declaration JSON file to be deployed. Leave as **NOT_SPECIFIED** to deploy without a service configuration."
             },
@@ -430,12 +456,14 @@
         "intSubnetPrivateAddress": "[concat(parameters('vnetAddressPrefix'), '.3.4')]",
         "intNicName": "[concat(variables('dnsLabel'), '-int')]",
         "intSubnetId": "[concat(variables('vnetId'), '/subnets/', variables('intsubnetName'))]",
+        "appSubnetId": "[concat(variables('vnetId'), '/subnets/', variables('appsubnetName'))]",
         "mgmtSubnetPrivateAddress1": "[concat(parameters('vnetAddressPrefix'), '.1.5')]",
         "extSubnetPrivateAddress1": "[concat(parameters('vnetAddressPrefix'), '.2.5')]",
         "intSubnetPrivateAddress1": "[concat(parameters('vnetAddressPrefix'), '.3.5')]",
         "intSubnetPrivateAddress2": "[concat(parameters('vnetAddressPrefix'), '.3.10')]",
         "intSubnetPrivateAddress3": "[concat(parameters('vnetAddressPrefix'), '.3.11')]",
         "internalLoadBalancerAddress": "[concat(parameters('vnetAddressPrefix'), '.3.50')]",
+        "appServerAddress": "[concat(parameters('vnetAddressPrefix'), '.4.100')]",
         "availabilitySetName": "[concat(variables('dnsLabel'), '-avset')]",
         "zoneMappings": "[replace(toLower(string(providers('Microsoft.Compute', 'virtualMachines').zoneMappings)), ' ', '')]",
         "zonesAvailable": "[contains(variables('zoneMappings'), concat('\"', variables('location'), '\"'))]",
@@ -523,9 +551,87 @@
                 "linuxConfiguration": "[variables('linuxConfiguration')]"
             }
         },
-        "installCustomConfig": "[concat(variables('singleQuote'), '#!/bin/bash\n', variables('customConfig'), variables('singleQuote'))]"
+        "installCustomConfig": "[concat(variables('singleQuote'), '#!/bin/bash\n', variables('customConfig'), variables('singleQuote'))]",
+        "imagePublisher": "Canonical",
+        "imageOffer": "UbuntuServer",
+        "appServerNicName": "[concat(variables('appServerName'), '-nic')]",
+        "appServerName": "MyUbuntuVM",
+        "vmSize": "Standard_A1",
+        "VDSSJumpBoxLinuxCustomData": "#cloud-config\nwrite_files:\n\n - path: /etc/apt/sources.list.d/azure-cli.list\n   permissions: '0644'\n   owner: root:root\n   content: |\n      deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ wheezy main\nruncmd:\n  - sudo apt-key adv --keyserver packages.microsoft.com --recv-keys 52E16F86FEE04B979B07E28DB02C46DF417A0893\n  - sudo apt-get install software-properties-common\n  - sudo apt-add-repository -y ppa:ansible/ansible\n  - sudo apt-get update -y\n  - sudo apt-get install -y virtualenv\n  - sudo apt-get install -y apt-transport-https\n  - sudo apt-get update && sudo apt-get install -y azure-cli --allow-unauthenticated\n  - sudo apt-get install -y python-pip\n  - sudo apt-get install -y jq\n  - sudo apt-get install -y docker.io\n  - docker run -d -p 80:80 --net=host --restart unless-stopped -e F5DEMO_APP=website -e F5DEMO_NODENAME='F5 Azure SACA' -e F5DEMO_COLOR=ffd734 -e F5DEMO_NODENAME_SSL='F5 Azure SACA (SSL)' -e F5DEMO_COLOR_SSL=a0bf37 chen23/f5-demo-app:ssl\n  - sudo -u AZURE_USER HOME=/home/AZURE_USER bash /home/AZURE_USER/f5-azure-saca/doall.sh &> /home/AZURE_USER/output.log"
     },
     "resources": [
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "dependsOn": [
+                "[variables('vnetId')]",
+                "[variables('appSubnetId')]"
+            ],
+            "apiVersion": "[variables('networkApiVersion')]",
+            "name": "[variables('appServerNicName')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "ipConfigurations": [
+                {
+                    "name": "ipconfig1",
+                    "properties": {
+                    "privateIPAllocationMethod": "Static",
+                    "privateIPAddress": "[variables('appServerAddress')]",
+                    "subnet": {
+                        "id": "[variables('appSubnetId')]"
+                    }
+                    }
+                }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('dnsLabel'), '-', variables('instanceName'), '0')]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('dnsLabel'), '-', variables('instanceName'), '1')]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('appServerNicName'))]"
+            ],
+            "apiVersion": "[variables('computeApiVersion')]",
+            "name": "[variables('appServerName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces/', variables('appServerNicName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                "vmSize": "[variables('vmSize')]"
+                },
+                "osProfile": {
+                "computerName": "[variables('appServerName')]",
+                "adminUsername": "[parameters('adminUsernameUbuntu')]",
+                "adminPassword": "[parameters('adminPasswordOrKeyUbuntu')]",
+                "customData": "[base64(replace(variables('VDSSJumpBoxLinuxCustomData'),'AZURE_USER',parameters('adminUsernameUbuntu')))]"
+                },
+                "storageProfile": {
+                "imageReference": {
+                    "publisher": "[variables('imagePublisher')]",
+                    "offer": "[variables('imageOffer')]",
+                    "sku": "[parameters('ubuntuOSVersion')]",
+                    "version": "latest"
+                },
+                "osDisk": {
+                    "createOption": "FromImage"
+                }
+                },
+                "networkProfile": {
+                "networkInterfaces": [
+                    {
+                    "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('appServerNicName'))]"
+                    }
+                ]
+                },
+                "diagnosticsProfile": {
+                "bootDiagnostics": {
+                    "enabled": false
+                }
+                }
+            }
+        },
         {
             "type": "Microsoft.Network/routeTables",
             "name": "[variables('routeTableName')]",
