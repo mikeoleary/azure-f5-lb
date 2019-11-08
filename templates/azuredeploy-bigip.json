@@ -563,9 +563,8 @@
         {
             "type": "Microsoft.Network/networkInterfaces",
             "dependsOn": [
-                "[variables('vnetId')]",
-                "[variables('appSubnetId')]"
-            ],
+                "[variables('vnetId')]"
+                ],
             "apiVersion": "[variables('networkApiVersion')]",
             "name": "[variables('appServerNicName')]",
             "location": "[variables('location')]",
