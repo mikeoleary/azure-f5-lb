@@ -86,7 +86,7 @@
                 "All-protocol",
                 "DO_NOT_USE"
             ],
-            "defaultValue": "Per-protocol",
+            "defaultValue": "All-protocol",
             "metadata": {
                 "description": "Specify a the type of internal Azure load balancer to deploy. Note: As of the initial release of this template, the all-protocol Azure load balancer is in public preview. Please ensure that this feature is enabled before selecting **All-protocol**."
             },
@@ -238,6 +238,13 @@
             },
             "type": "string"
         },
+        "restrictedSrcAddressApp": {
+            "defaultValue": "*",
+            "metadata": {
+                "description": "This field restricts application access to a specific network or address. Enter an IP address or address range in CIDR notation, or asterisk for all sources"
+            },
+            "type": "string"
+        },
         "tagValues": {
             "defaultValue": {
                 "application": "APP",
@@ -359,6 +366,7 @@
         },
         "subscriptionID": "[subscription().subscriptionId]",
         "resourceGroupName": "[resourceGroup().name]",
+        "routeTableName": "RouteToIntLB",
         "singleQuote": "'",
         "f5CloudLibsTag": "v4.11.0",
         "f5CloudLibsAzureTag": "v2.10.0",
@@ -418,6 +426,7 @@
         "extSubnetId": "[concat(variables('vnetId'), '/subnets/', variables('extsubnetName'))]",
         "routeCmd": "route",
         "intSubnetName": "internal",
+        "appSubnetName": "appSubnet",
         "intSubnetPrivateAddress": "[concat(parameters('vnetAddressPrefix'), '.3.4')]",
         "intNicName": "[concat(variables('dnsLabel'), '-int')]",
         "intSubnetId": "[concat(variables('vnetId'), '/subnets/', variables('intsubnetName'))]",
@@ -438,6 +447,7 @@
         "tmmRouteGw": "[concat(parameters('vnetAddressPrefix'), '.2.1')]",
         "extSubnetPrefix": "[concat(parameters('vnetAddressPrefix'), '.2.0/24')]",
         "intSubnetPrefix": "[concat(parameters('vnetAddressPrefix'), '.3.0/24')]",
+        "appSubnetPrefix": "[concat(parameters('vnetAddressPrefix'), '.4.0/24')]",
         "numberOfExternalIps": "[parameters('numberOfExternalIps')]",
         "backEndAddressPoolArray": [
             {
@@ -516,6 +526,24 @@
         "installCustomConfig": "[concat(variables('singleQuote'), '#!/bin/bash\n', variables('customConfig'), variables('singleQuote'))]"
     },
     "resources": [
+        {
+            "type": "Microsoft.Network/routeTables",
+            "name": "[variables('routeTableName')]",
+            "apiVersion": "[variables('networkApiVersion')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "routes": [
+                {
+                    "name": "DefaultRouteToIntLB",
+                    "properties": {
+                    "addressPrefix": "0.0.0.0/0",
+                    "nextHopType": "VirtualAppliance",
+                    "nextHopIpAddress": "[variables('internalLoadBalancerAddress')]"
+                    }
+                }
+                ]
+            }
+        },
         {
             "apiVersion": "[variables('networkApiVersion')]",
             "sku": {
@@ -602,6 +630,9 @@
         },
         {
             "apiVersion": "[variables('networkApiVersion')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/routeTables/', variables('routeTableName'))]"
+            ],
             "location": "[variables('location')]",
             "name": "[variables('virtualNetworkName')]",
             "properties": {
@@ -627,6 +658,15 @@
                         "name": "[variables('intSubnetName')]",
                         "properties": {
                             "addressPrefix": "[variables('intSubnetPrefix')]"
+                        }
+                    },
+                                        {
+                        "name": "[variables('appSubnetName')]",
+                        "properties": {
+                            "routeTable": {
+                                "id": "[resourceId('Microsoft.Network/routeTables', variables('routeTableName'))]"
+                            },
+                            "addressPrefix": "[variables('appSubnetPrefix')]"
                         }
                     }
                 ]
@@ -932,7 +972,36 @@
             "location": "[variables('location')]",
             "name": "[concat(variables('dnsLabel'), '-ext-nsg')]",
             "properties": {
-                "securityRules": []
+                "securityRules": [
+                    {
+                        "name": "ext_allow_http",
+                        "properties": {
+                            "access": "Allow",
+                            "description": "",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "80",
+                            "direction": "Inbound",
+                            "priority": 101,
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "[parameters('restrictedSrcAddressApp')]",
+                            "sourcePortRange": "*"
+                        }
+                    },
+                    {
+                        "name": "ext_allow_https",
+                        "properties": {
+                            "access": "Allow",
+                            "description": "",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "443",
+                            "direction": "Inbound",
+                            "priority": 102,
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "[parameters('restrictedSrcAddressApp')]",
+                            "sourcePortRange": "*"
+                        }
+                    }
+                ]
             },
             "tags": "[if(empty(variables('tagValues')), json('null'), variables('tagValues'))]",
             "type": "Microsoft.Network/networkSecurityGroups"
@@ -973,7 +1042,7 @@
                         "Name": "external-access",
                         "properties": {
                             "backendAddressPool": {
-                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('externalLoadBalancerName')), '/backendAddressPools/loadBalancerMgmtBackEnd')]"
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('externalLoadBalancerName')), '/backendAddressPools/loadBalancerBackEnd')]"
                             },
                             "backendPort": 443,
                             "frontendIPConfiguration": {
