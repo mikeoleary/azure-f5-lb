@@ -1105,6 +1105,20 @@
                             "sourceAddressPrefix": "[parameters('restrictedSrcAddressApp')]",
                             "sourcePortRange": "*"
                         }
+                    },
+                    {
+                        "name": "ext_allow_ssh",
+                        "properties": {
+                            "access": "Allow",
+                            "description": "",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "22",
+                            "direction": "Inbound",
+                            "priority": 103,
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "[parameters('restrictedSrcAddressApp')]",
+                            "sourcePortRange": "*"
+                        }
                     }
                 ]
             },
