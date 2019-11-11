@@ -29,7 +29,7 @@ param(
   $tagValues = '{"application": "APP", "cost": "COST", "environment": "ENV", "group": "GROUP", "owner": "OWNER"}',
   [string] [Parameter(Mandatory=$True)] $allowUsageAnalytics,
   [string] [Parameter(Mandatory=$True)] $resourceGroupName,
-  [string] $region = "West US",
+  [string] $region = "East US 2",
   [string] $templateFilePath = "azuredeploy.json",
   [string] $parametersFilePath = "azuredeploy.parameters.json"
 )
