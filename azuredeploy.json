@@ -535,7 +535,7 @@
         "newDataStorageAccountName": "[concat(uniqueString(variables('dnsLabel'), resourceGroup().id, deployment().name), 'data000')]",
         "dataStorageAccountType": "Standard_LRS",
         "deploymentId": "[concat(variables('subscriptionId'), resourceGroup().id, deployment().name, variables('dnsLabel'))]",
-        "customConfig": "### START (INPUT) CUSTOM CONFIGURATION HERE\n",
+        "customConfig": "[concat('tmsh create net route 10.0.0.0/8 gw ', parameters('vnetAddressPrefix'), '.3.1\n', 'tmsh create net route 172.16.0.0/12 gw ', parameters('vnetAddressPrefix'), '.3.1\n', 'tmsh create net route 192.168.0.0/16 gw ', parameters('vnetAddressPrefix'), '.3.1\n')]",
         "allowUsageAnalytics": {
             "No": {
                 "hashCmd": "echo AllowUsageAnalytics:No",
@@ -1476,13 +1476,33 @@
         }
     ],
     "outputs": {
-        "GUI-URL": {
+        "GUI-F5-1": {
             "type": "string",
             "value": "[concat('https://',reference(concat(variables('mgmtPublicIPAddressId'), '0')).dnsSettings.fqdn, ':', variables('bigIpMgmtPort'))]"
         },
-        "SSH-URL": {
+        "GUI-F5-2": {
+            "type": "string",
+            "value": "[concat('https://',reference(concat(variables('mgmtPublicIPAddressId'), '1')).dnsSettings.fqdn, ':', variables('bigIpMgmtPort'))]"
+        },
+         "GUI-APP-HTTPS": {
+            "type": "string",
+            "value": "[concat('https://',reference(concat(variables('extPublicIPAddressIdPrefix'), '0')).dnsSettings.fqdn)]"
+        },
+        "GUI-APP-HTTP": {
+            "type": "string",
+            "value": "[concat('http://',reference(concat(variables('extPublicIPAddressIdPrefix'), '0')).dnsSettings.fqdn)]"
+        },
+        "SSH-APP-VIP": {
+            "type": "string",
+            "value": "[concat(reference(concat(variables('extPublicIPAddressIdPrefix'), '0')).dnsSettings.fqdn,' ',22)]"
+        },
+        "SSH-URL-F5-1": {
             "type": "string",
             "value": "[concat(reference(concat(variables('mgmtPublicIPAddressId'), '0')).dnsSettings.fqdn,' ',22)]"
+        },
+        "SSH-URL-F5-2": {
+            "type": "string",
+            "value": "[concat(reference(concat(variables('mgmtPublicIPAddressId'), '1')).dnsSettings.fqdn,' ',22)]"
         }
     }
 }
