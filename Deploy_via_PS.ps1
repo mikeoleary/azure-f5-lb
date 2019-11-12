@@ -21,7 +21,7 @@ param(
   [string] [Parameter(Mandatory=$True)] $licenseKey1,
   [string] [Parameter(Mandatory=$True)] $licenseKey2,
   [string] [Parameter(Mandatory=$True)] $vnetAddressPrefix,
-  [string] [Parameter(Mandatory=$True)] $declarationUrl,
+  [string] [Parameter(Mandatory=$True)] $declarationUrl = "https://raw.githubusercontent.com/mikeoleary/azure-f5-lb/master/declaration.json",
   [string] [Parameter(Mandatory=$True)] $ntpServer,
   [string] [Parameter(Mandatory=$True)] $timeZone,
   [string] [Parameter(Mandatory=$True)] $customImage,
