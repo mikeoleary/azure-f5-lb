@@ -20,7 +20,8 @@
                         "10.0.2.11"
                     ],
                     "virtualPort": 22,
-                    "pool": "jumphost_ssh_pool"
+                    "pool": "jumphost_ssh_pool",
+                    "snat": "none"
                 },
                 "jumphost_ssh_pool": {
                     "class": "Pool",
@@ -47,7 +48,8 @@
                         "10.0.2.11"
                     ],
                     "virtualPort": 443,
-                    "pool": "jumphost_https_pool"
+                    "pool": "jumphost_https_pool",
+                    "snat": "none"
                 },
                 "jumphost_https_pool": {
                     "class": "Pool",
@@ -74,7 +76,8 @@
                         "10.0.2.11"
                     ],
                     "virtualPort": 80,
-                    "pool": "jumphost_http_pool"
+                    "pool": "jumphost_http_pool",
+                    "snat": "none"
                 },
                 "jumphost_http_pool": {
                     "class": "Pool",
@@ -108,9 +111,9 @@
                 "template": "generic",
                 "forward_outbound": {
                     "class": "Service_L4",
-		    "layer4": "any",
-		    "translateServerAddress": false,
-		    "translateServerPort": false,
+		            "layer4": "any",
+		            "translateServerAddress": false,
+		            "translateServerPort": false,
                     "virtualAddresses": [
                         "0.0.0.0"
                     ],
